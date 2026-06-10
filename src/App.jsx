@@ -1,4 +1,4 @@
-﻿import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+﻿import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AppProvider } from './store/AppContext'
 import Layout from './components/layout/Layout'
 import Dashboard from './pages/Dashboard'
@@ -11,7 +11,7 @@ import Settings from './pages/Settings'
 export default function App() {
   return (
     <AppProvider>
-      <BrowserRouter basename={import.meta.env.BASE_URL}>
+      <HashRouter>
         <Routes>
           <Route path="/" element={<Layout />}>
             <Route index element={<Navigate to="/dashboard" replace />} />
@@ -23,8 +23,7 @@ export default function App() {
             <Route path="settings" element={<Settings />} />
           </Route>
         </Routes>
-      </BrowserRouter>
+      </HashRouter>
     </AppProvider>
   )
 }
-
