@@ -1,8 +1,10 @@
 ﻿import { useState } from 'react'
-import { useApp } from '../store/AppContext'
+import { useApp, useRate } from '../store/AppContext'
+import { fmtKgs, usdToKgs } from '../lib/currency'
 
 export default function Settings() {
   const { state, dispatch } = useApp()
+  const rate = useRate()
   const { settings, goal } = state
 
   const [form, setForm] = useState({ ...settings })
@@ -28,6 +30,7 @@ export default function Settings() {
         erRate: parseFloat(goalForm.erRate) || 0.08,
         pgTarget: parseInt(goalForm.pgTarget) || 12000,
         erTarget: parseInt(goalForm.erTarget) || 8000,
+        targetEarnings: parseFloat(goalForm.targetEarnings) || 0,
       },
     })
     setGoalSaved(true)
@@ -39,6 +42,9 @@ export default function Settings() {
     localStorage.clear()
     window.location.reload()
   }
+
+  const maxPossible = (parseInt(goalForm.pgTarget) || 0) * (parseFloat(goalForm.pgRate) || 0)
+                    + (parseInt(goalForm.erTarget) || 0) * (parseFloat(goalForm.erRate) || 0)
 
   return (
     <div className="page">
@@ -116,7 +122,7 @@ export default function Settings() {
                   <input type="number" step="0.01" className="field-input" value={goalForm.erRate} onChange={e => setGoalForm(f => ({ ...f, erRate: e.target.value }))} />
                 </div>
               </div>
-              <div className="g2" style={{ marginBottom: 20 }}>
+              <div className="g2" style={{ marginBottom: 14 }}>
                 <div className="field">
                   <label className="field-label">Цель PG (из {goalForm.totalTasks})</label>
                   <input type="number" className="field-input" value={goalForm.pgTarget} onChange={e => setGoalForm(f => ({ ...f, pgTarget: e.target.value }))} />
@@ -126,6 +132,33 @@ export default function Settings() {
                   <input type="number" className="field-input" value={goalForm.erTarget} onChange={e => setGoalForm(f => ({ ...f, erTarget: e.target.value }))} />
                 </div>
               </div>
+
+              {/* Target earnings */}
+              <div style={{ marginBottom: 18, padding: '14px 16px', background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.18)', borderRadius: 'var(--radius-sm)' }}>
+                <div className="field">
+                  <label className="field-label" style={{ color: 'var(--secondary)' }}>💰 Целевой заработок ($)</label>
+                  <input
+                    type="number"
+                    step="10"
+                    className="field-input"
+                    placeholder="Сколько хочешь заработать..."
+                    value={goalForm.targetEarnings || ''}
+                    onChange={e => setGoalForm(f => ({ ...f, targetEarnings: e.target.value }))}
+                  />
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 5, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                    {goalForm.targetEarnings > 0 && (
+                      <>
+                        <span>≈ <strong style={{ color: 'var(--warning)' }}>{fmtKgs(usdToKgs(parseFloat(goalForm.targetEarnings), rate))}</strong></span>
+                        {maxPossible > 0 && (
+                          <span>Макс. возможный: <strong style={{ color: 'var(--text)' }}>${maxPossible.toFixed(2)}</strong></span>
+                        )}
+                      </>
+                    )}
+                    {!goalForm.targetEarnings && <span>Введи сумму — дашборд покажет прогресс к цели</span>}
+                  </div>
+                </div>
+              </div>
+
               <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>
                 {goalSaved ? '✅ Сохранено!' : 'Сохранить цели'}
               </button>
@@ -150,14 +183,13 @@ export default function Settings() {
       {/* About */}
       <div className="card" style={{ marginTop: 20 }}>
         <div className="card-header"><div className="card-title">ℹ️ О приложении</div></div>
-        <div style={{ display: 'flex', gap: 40, fontSize: 13, color: 'var(--text-muted)' }}>
+        <div style={{ display: 'flex', gap: 40, fontSize: 13, color: 'var(--text-muted)', flexWrap: 'wrap' }}>
           <div><strong style={{ color: 'var(--text)' }}>WorkTracker</strong><br/>Бизнес-дашборд для AI labeling и задач</div>
           <div><strong style={{ color: 'var(--text)' }}>Хранение данных</strong><br/>Всё в localStorage браузера</div>
           <div><strong style={{ color: 'var(--text)' }}>ClickUp API</strong><br/>REST API v2, Personal Token</div>
-          <div><strong style={{ color: 'var(--text)' }}>Версия</strong><br/>1.0.0 · React 19 + Vite</div>
+          <div><strong style={{ color: 'var(--text)' }}>Версия</strong><br/>1.1.0 · React 19 + Vite</div>
         </div>
       </div>
     </div>
   )
 }
-

@@ -10,6 +10,7 @@ const defaultGoal = {
   erRate: 0.08,
   pgTarget: 12000,
   erTarget: 8000,
+  targetEarnings: 2000,
 }
 
 const defaultState = {
@@ -92,17 +93,30 @@ export function calcStats(entries, goal) {
   const total = totalPG + totalER
   const earned = totalPG * goal.pgRate + totalER * goal.erRate
   const maxEarned = goal.pgTarget * goal.pgRate + goal.erTarget * goal.erRate
+  const targetEarnings = goal.targetEarnings || 0
+  const earningsLeft = Math.max(0, targetEarnings - earned)
+  const earningsPct = targetEarnings > 0 ? Math.min(100, (earned / targetEarnings) * 100) : 0
   const today = new Date().toISOString().slice(0, 10)
   const deadlineDate = new Date(goal.deadline)
   const todayDate = new Date(today)
   const daysLeft = Math.max(0, Math.ceil((deadlineDate - todayDate) / 86400000))
   const remaining = goal.totalTasks - total
   const neededPerDay = daysLeft > 0 ? Math.ceil(remaining / daysLeft) : remaining
+  const pgRemaining = Math.max(0, goal.pgTarget - totalPG)
+  const erRemaining = Math.max(0, goal.erTarget - totalER)
+  const pgNeededPerDay = daysLeft > 0 ? Math.ceil(pgRemaining / daysLeft) : pgRemaining
+  const erNeededPerDay = daysLeft > 0 ? Math.ceil(erRemaining / daysLeft) : erRemaining
   const daysWorked = entries.length
   const avgPerDay = daysWorked > 0 ? Math.round(total / daysWorked) : 0
   const onTrack = avgPerDay >= neededPerDay
   const projectedEarnings = daysWorked > 0 && total > 0
     ? earned + avgPerDay * daysLeft * (earned / total)
     : earned
-  return { totalPG, totalER, total, earned, maxEarned, daysLeft, neededPerDay, avgPerDay, onTrack, projectedEarnings, remaining }
+  return {
+    totalPG, totalER, total, earned, maxEarned,
+    targetEarnings, earningsLeft, earningsPct,
+    daysLeft, neededPerDay, pgNeededPerDay, erNeededPerDay,
+    pgRemaining, erRemaining,
+    avgPerDay, onTrack, projectedEarnings, remaining,
+  }
 }
