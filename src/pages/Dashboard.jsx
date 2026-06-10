@@ -1,14 +1,15 @@
-﻿import { useApp, calcStats } from '../store/AppContext'
+﻿import { useApp, calcStats, useRate } from '../store/AppContext'
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
+import { fmtKgs, usdToKgs } from '../lib/currency'
 
-function ProgressBar({ label, value, max, color, extra }) {
+function ProgressBar({ label, value, max, color }) {
   const pct = Math.min(100, max > 0 ? (value / max) * 100 : 0)
   return (
-    <div className="progress-wrap" style={{ marginBottom: 16 }}>
+    <div className="progress-wrap" style={{ marginBottom: 14 }}>
       <div className="progress-row">
         <span>{label}</span>
-        <span>{value.toLocaleString()} / {max.toLocaleString()} {extra}</span>
+        <span>{value.toLocaleString()} / {max.toLocaleString()}</span>
       </div>
       <div className="progress-track">
         <div className={`progress-fill ${color}`} style={{ width: `${pct}%` }} />
@@ -17,8 +18,29 @@ function ProgressBar({ label, value, max, color, extra }) {
   )
 }
 
+function Money({ usd, rate, big }) {
+  const kgs = usdToKgs(usd, rate)
+  if (big) return (
+    <div>
+      <div className="stat-big green">${usd.toFixed(2)}</div>
+      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--warning)', marginTop: 4 }}>
+        ≈ {fmtKgs(kgs)}
+      </div>
+    </div>
+  )
+  return (
+    <span>
+      ${usd.toFixed(2)}
+      <span style={{ fontSize: '0.82em', color: 'var(--warning)', marginLeft: 6, fontWeight: 600 }}>
+        ≈ {fmtKgs(kgs)}
+      </span>
+    </span>
+  )
+}
+
 export default function Dashboard() {
   const { state } = useApp()
+  const rate = useRate()
   const navigate = useNavigate()
   const { entries, goal, tasks } = state
   const s = calcStats(entries, goal)
@@ -26,12 +48,10 @@ export default function Dashboard() {
   const todayEntry = entries.find(e => e.date === today)
   const todayTotal = todayEntry ? (todayEntry.pg || 0) + (todayEntry.er || 0) : 0
   const pendingTasks = tasks.filter(t => !t.done).length
-
   const recentEntries = entries.slice(0, 5)
 
   return (
     <div className="page">
-      {/* Hero stats */}
       <div className="g4" style={{ marginBottom: 24 }}>
         <div className="card">
           <div className="card-label">Выполнено</div>
@@ -44,28 +64,43 @@ export default function Dashboard() {
 
         <div className="card">
           <div className="card-label">Заработано</div>
-          <div className="stat-big green" style={{ marginTop: 8 }}>${s.earned.toFixed(2)}</div>
-          <div className="stat-sub">из ${s.maxEarned.toFixed(2)}</div>
-          <div className="stat-pill neutral">Прогноз: ${s.projectedEarnings.toFixed(2)}</div>
+          <div style={{ marginTop: 8 }}>
+            <Money usd={s.earned} rate={rate} big />
+          </div>
+          <div className="stat-sub" style={{ marginTop: 8 }}>из ${s.maxEarned.toFixed(2)} / {fmtKgs(usdToKgs(s.maxEarned, rate))}</div>
         </div>
 
         <div className="card">
-          <div className="card-label">Темп</div>
-          <div className="stat-big" style={{ marginTop: 8 }}>{s.avgPerDay.toLocaleString()}</div>
-          <div className="stat-sub">среднее / день</div>
-          <div className="stat-pill neutral">Нужно: {s.neededPerDay.toLocaleString()}/день</div>
+          <div className="card-label">Нужно / день</div>
+          <div className="stat-big" style={{ marginTop: 8 }}>{s.neededPerDay.toLocaleString()}</div>
+          <div className="stat-sub">Среднее: {s.avgPerDay.toLocaleString()}/день</div>
+          <div className={`stat-pill ${s.onTrack ? 'up' : 'warn'}`}>
+            {s.onTrack ? '✓ Успеваешь' : '⚠ Нужно больше'}
+          </div>
         </div>
 
         <div className="card">
-          <div className="card-label">Дней осталось</div>
-          <div className="stat-big" style={{ marginTop: 8 }}>{s.daysLeft}</div>
-          <div className="stat-sub">до {goal.deadline}</div>
-          <div className="stat-pill neutral">Сегодня: {todayTotal.toLocaleString()}</div>
+          <div className="card-label">Прогноз заработка</div>
+          <div style={{ marginTop: 8 }}>
+            <div className="stat-big">${s.projectedEarnings.toFixed(2)}</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--warning)', marginTop: 4 }}>
+              ≈ {fmtKgs(usdToKgs(s.projectedEarnings, rate))}
+            </div>
+          </div>
+          <div className="stat-sub" style={{ marginTop: 8 }}>при текущем темпе</div>
         </div>
       </div>
 
+      {/* Exchange rate chip */}
+      <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="chip" style={{ fontSize: 12 }}>
+          <span>💱</span>
+          <span>1 USD = <strong style={{ color: 'var(--warning)' }}>{rate.toFixed(1)} сом</strong></span>
+        </div>
+        <div className="chip" style={{ fontSize: 11, color: 'var(--text-dim)' }}>Курс обновляется автоматически</div>
+      </div>
+
       <div className="g2" style={{ marginBottom: 24 }}>
-        {/* Progress */}
         <div className="card">
           <div className="card-header">
             <div className="card-title">Прогресс</div>
@@ -76,7 +111,6 @@ export default function Dashboard() {
           <ProgressBar label={`Edit Reward ($${goal.erRate})`} value={s.totalER} max={goal.erTarget} color="amber" />
         </div>
 
-        {/* Tasks overview */}
         <div className="card">
           <div className="card-header">
             <div className="card-title">Задачи ClickUp</div>
@@ -104,7 +138,6 @@ export default function Dashboard() {
                 <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
                   <span style={{ fontSize: 14 }}>{t.done ? '✅' : '⬜'}</span>
                   <span style={{ fontSize: 13, color: t.done ? 'var(--text-dim)' : 'var(--text)', textDecoration: t.done ? 'line-through' : 'none', flex: 1 }}>{t.name}</span>
-                  {t.priority && <span className={`badge badge-${t.priority === 'urgent' ? 'red' : t.priority === 'high' ? 'amber' : 'gray'}`}>{t.priority}</span>}
                 </div>
               ))}
             </>
@@ -112,7 +145,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Recent entries */}
       <div className="card">
         <div className="card-header">
           <div className="card-title">Последние записи</div>
@@ -132,7 +164,8 @@ export default function Dashboard() {
                 <th>Prompt Grading</th>
                 <th>Edit Reward</th>
                 <th>Итого</th>
-                <th>Заработано</th>
+                <th>USD</th>
+                <th>Сомы</th>
               </tr>
             </thead>
             <tbody>
@@ -146,6 +179,7 @@ export default function Dashboard() {
                     <td className="green">{(e.er || 0).toLocaleString()}</td>
                     <td className="bold">{total.toLocaleString()}</td>
                     <td className="green">${earned.toFixed(2)}</td>
+                    <td style={{ color: 'var(--warning)', fontWeight: 600 }}>{fmtKgs(usdToKgs(earned, rate))}</td>
                   </tr>
                 )
               })}
@@ -156,4 +190,3 @@ export default function Dashboard() {
     </div>
   )
 }
-

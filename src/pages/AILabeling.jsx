@@ -1,6 +1,7 @@
 ﻿import { useState } from 'react'
-import { useApp, calcStats } from '../store/AppContext'
+import { useApp, calcStats, useRate } from '../store/AppContext'
 import { format } from 'date-fns'
+import { fmtKgs, usdToKgs } from '../lib/currency'
 
 function ProgressBar({ label, value, max, color }) {
   const pct = Math.min(100, max > 0 ? (value / max) * 100 : 0)
@@ -19,9 +20,9 @@ function ProgressBar({ label, value, max, color }) {
 
 export default function AILabeling() {
   const { state, dispatch } = useApp()
+  const rate = useRate()
   const { entries, goal } = state
   const s = calcStats(entries, goal)
-
   const today = format(new Date(), 'yyyy-MM-dd')
   const [date, setDate] = useState(today)
   const [pg, setPg] = useState('')
@@ -32,13 +33,8 @@ export default function AILabeling() {
   function handleAdd(e) {
     e.preventDefault()
     if (!date) return
-    dispatch({
-      type: 'ADD_ENTRY',
-      payload: { date, pg: parseInt(pg) || 0, er: parseInt(er) || 0 },
-    })
-    setPg('')
-    setEr('')
-    setDate(today)
+    dispatch({ type: 'ADD_ENTRY', payload: { date, pg: parseInt(pg) || 0, er: parseInt(er) || 0 } })
+    setPg(''); setEr(''); setDate(today)
   }
 
   function handleSaveEdit(e) {
@@ -51,7 +47,6 @@ export default function AILabeling() {
 
   return (
     <div className="page">
-      {/* Add form */}
       <div className="card" style={{ marginBottom: 24, background: 'linear-gradient(135deg, rgba(124,58,237,0.12), rgba(139,92,246,0.06))' }}>
         <div className="card-header">
           <div className="card-title">➕ Добавить день</div>
@@ -71,12 +66,11 @@ export default function AILabeling() {
               <label className="field-label">Edit Reward ($0.08)</label>
               <input type="number" min="0" className="field-input" placeholder="0" value={er} onChange={e => setEr(e.target.value)} />
             </div>
-            <button type="submit" className="btn btn-primary" style={{ marginBottom: 0 }}>Добавить</button>
+            <button type="submit" className="btn btn-primary">Добавить</button>
           </div>
         </form>
       </div>
 
-      {/* Stats row */}
       <div className="g4" style={{ marginBottom: 24 }}>
         <div className="card">
           <div className="card-label">Выполнено</div>
@@ -86,7 +80,7 @@ export default function AILabeling() {
         <div className="card">
           <div className="card-label">Заработано</div>
           <div className="stat-big green" style={{ marginTop: 8 }}>${s.earned.toFixed(2)}</div>
-          <div className="stat-sub">из ${(goal.pgTarget * goal.pgRate + goal.erTarget * goal.erRate).toFixed(2)}</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--warning)', marginTop: 4 }}>≈ {fmtKgs(usdToKgs(s.earned, rate))}</div>
         </div>
         <div className="card">
           <div className="card-label">Нужно / день</div>
@@ -96,11 +90,16 @@ export default function AILabeling() {
         <div className="card">
           <div className="card-label">Прогноз заработка</div>
           <div className="stat-big" style={{ marginTop: 8 }}>${s.projectedEarnings.toFixed(2)}</div>
-          <div className="stat-sub">при текущем темпе</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--warning)', marginTop: 4 }}>≈ {fmtKgs(usdToKgs(s.projectedEarnings, rate))}</div>
         </div>
       </div>
 
-      {/* Progress */}
+      {/* Rate chip */}
+      <div className="chip" style={{ marginBottom: 20, display: 'inline-flex' }}>
+        <span>💱</span>
+        <span>1 USD = <strong style={{ color: 'var(--warning)' }}>{rate.toFixed(1)} сом</strong> (актуальный курс)</span>
+      </div>
+
       <div className="card" style={{ marginBottom: 24 }}>
         <div className="card-header"><div className="card-title">Прогресс</div></div>
         <ProgressBar label="Общий прогресс" value={s.total} max={goal.totalTasks} color="purple" />
@@ -108,7 +107,6 @@ export default function AILabeling() {
         <ProgressBar label={`Edit Reward ($${goal.erRate})`} value={s.totalER} max={goal.erTarget} color="amber" />
       </div>
 
-      {/* History */}
       <div className="card">
         <div className="card-header">
           <div className="card-title">История ({entries.length} дней)</div>
@@ -122,18 +120,9 @@ export default function AILabeling() {
         {editEntry && (
           <form onSubmit={handleSaveEdit} style={{ marginBottom: 16, padding: 16, background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)' }}>
             <div className="form-row">
-              <div className="field">
-                <label className="field-label">Дата</label>
-                <input type="date" className="field-input" value={editEntry.date} readOnly />
-              </div>
-              <div className="field">
-                <label className="field-label">Prompt Grading</label>
-                <input type="number" min="0" className="field-input" value={editEntry.pg} onChange={e => setEditEntry({ ...editEntry, pg: parseInt(e.target.value) || 0 })} />
-              </div>
-              <div className="field">
-                <label className="field-label">Edit Reward</label>
-                <input type="number" min="0" className="field-input" value={editEntry.er} onChange={e => setEditEntry({ ...editEntry, er: parseInt(e.target.value) || 0 })} />
-              </div>
+              <div className="field"><label className="field-label">Дата</label><input type="date" className="field-input" value={editEntry.date} readOnly /></div>
+              <div className="field"><label className="field-label">Prompt Grading</label><input type="number" min="0" className="field-input" value={editEntry.pg} onChange={e => setEditEntry({ ...editEntry, pg: parseInt(e.target.value) || 0 })} /></div>
+              <div className="field"><label className="field-label">Edit Reward</label><input type="number" min="0" className="field-input" value={editEntry.er} onChange={e => setEditEntry({ ...editEntry, er: parseInt(e.target.value) || 0 })} /></div>
               <button type="submit" className="btn btn-primary">Сохранить</button>
               <button type="button" className="btn btn-ghost" onClick={() => setEditEntry(null)}>Отмена</button>
             </div>
@@ -141,22 +130,11 @@ export default function AILabeling() {
         )}
 
         {entries.length === 0 ? (
-          <div className="empty">
-            <div className="empty-ico">🤖</div>
-            <div className="empty-title">Нет записей</div>
-            <div className="empty-sub">Добавь первый день с помощью формы выше</div>
-          </div>
+          <div className="empty"><div className="empty-ico">🤖</div><div className="empty-title">Нет записей</div><div className="empty-sub">Добавь первый день выше</div></div>
         ) : (
           <table className="tbl">
             <thead>
-              <tr>
-                <th>Дата</th>
-                <th>Prompt Grading</th>
-                <th>Edit Reward</th>
-                <th>Итого</th>
-                <th>Заработано</th>
-                <th>Действия</th>
-              </tr>
+              <tr><th>Дата</th><th>Prompt Grading</th><th>Edit Reward</th><th>Итого</th><th>USD</th><th>Сомы 🇰🇬</th><th></th></tr>
             </thead>
             <tbody>
               {displayed.map(e => {
@@ -169,6 +147,7 @@ export default function AILabeling() {
                     <td className="green">{(e.er || 0).toLocaleString()}</td>
                     <td className="bold">{total.toLocaleString()}</td>
                     <td className="green">${earned.toFixed(2)}</td>
+                    <td style={{ color: 'var(--warning)', fontWeight: 600 }}>{fmtKgs(usdToKgs(earned, rate))}</td>
                     <td>
                       <div style={{ display: 'flex', gap: 6 }}>
                         <button className="btn btn-ghost btn-sm" onClick={() => setEditEntry({ ...e })}>✏️</button>
@@ -185,4 +164,3 @@ export default function AILabeling() {
     </div>
   )
 }
-

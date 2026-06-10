@@ -1,4 +1,5 @@
-﻿import { createContext, useContext, useReducer, useEffect } from 'react'
+﻿import { createContext, useContext, useReducer, useEffect, useState } from 'react'
+import { fetchUsdKgsRate } from '../lib/currency'
 
 const STORAGE_KEY = 'ai_tracker_v1'
 
@@ -59,27 +60,38 @@ function reducer(state, action) {
 }
 
 const Ctx = createContext(null)
+const RateCtx = createContext(87.5)
 
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, undefined, load)
+  const [kgsRate, setKgsRate] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('usd_kgs_rate') || 'null')?.rate || 87.5 } catch { return 87.5 }
+  })
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
   }, [state])
 
-  return <Ctx.Provider value={{ state, dispatch }}>{children}</Ctx.Provider>
+  useEffect(() => {
+    fetchUsdKgsRate().then(setKgsRate)
+  }, [])
+
+  return (
+    <RateCtx.Provider value={kgsRate}>
+      <Ctx.Provider value={{ state, dispatch }}>{children}</Ctx.Provider>
+    </RateCtx.Provider>
+  )
 }
 
-export function useApp() {
-  return useContext(Ctx)
-}
+export function useApp() { return useContext(Ctx) }
+export function useRate() { return useContext(RateCtx) }
 
 export function calcStats(entries, goal) {
   const totalPG = entries.reduce((s, e) => s + (e.pg || 0), 0)
   const totalER = entries.reduce((s, e) => s + (e.er || 0), 0)
   const total = totalPG + totalER
   const earned = totalPG * goal.pgRate + totalER * goal.erRate
-  const maxEarned = goal.totalTasks * ((goal.pgTarget / goal.totalTasks) * goal.pgRate + (goal.erTarget / goal.totalTasks) * goal.erRate)
+  const maxEarned = goal.pgTarget * goal.pgRate + goal.erTarget * goal.erRate
   const today = new Date().toISOString().slice(0, 10)
   const deadlineDate = new Date(goal.deadline)
   const todayDate = new Date(today)
@@ -89,6 +101,8 @@ export function calcStats(entries, goal) {
   const daysWorked = entries.length
   const avgPerDay = daysWorked > 0 ? Math.round(total / daysWorked) : 0
   const onTrack = avgPerDay >= neededPerDay
-  const projectedEarnings = daysLeft > 0 ? earned + avgPerDay * daysLeft * (earned / (total || 1)) : earned
+  const projectedEarnings = daysWorked > 0 && total > 0
+    ? earned + avgPerDay * daysLeft * (earned / total)
+    : earned
   return { totalPG, totalER, total, earned, maxEarned, daysLeft, neededPerDay, avgPerDay, onTrack, projectedEarnings, remaining }
 }
